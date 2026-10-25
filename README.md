@@ -47,6 +47,7 @@ Options:
 | Option | Meaning | Example |
 |---|---|---|
 | `--lines FROM-TO` | only print nodes that overlap these lines | `--lines 14-22` |
+| `--no-comments` | hide `//` and `/* */` comment nodes | `--no-comments` |
 | `--all` | also print keywords and punctuation (`"throws"`, `"{"`, `","`) | `--all` |
 
 ```bash
@@ -60,22 +61,62 @@ Shortcut through npm (the `--` passes the arguments on to the script):
 npm run ast -- fixtures/LogAndThrow.java --lines 14-22
 ```
 
+### Save the output to a file
+
+Long trees are easier to read in VS Code than in the terminal. `>` sends the output into a file
+instead of the screen (`out/` is ignored by git):
+
+```bash
+mkdir -p out
+node dist/printAst.js fixtures/LogAndThrow.java --no-comments > out/LogAndThrow.ast.txt
+```
+
+Then open `out/LogAndThrow.ast.txt` in VS Code. Tip: VS Code can fold (collapse) the indented
+branches using the arrows next to the line numbers.
+
 ## How to read the output
 
-```
-catch_clause [lines 18-21]
-  catch_formal_parameter [line 18]
-    catch_type [line 18]
-      type_identifier [line 18]  "IOException"
-    name: identifier [line 18]  "e"
+Java (lines 18-21 of `fixtures/LogAndThrow.java`):
+
+```java
+} catch (IOException e) {
+    LOG.error("read failed", e);
+    throw e;
+}
 ```
 
-- **Indentation** = nesting: a node is inside the node above it with less indentation.
-- **`catch_clause`, `type_identifier`, ...** = the node type. Detectors search for these.
-- **`name:`** = a field, a named slot in the parent (e.g. a method's `name`, a call's `object`).
-- **`[lines 18-21]`** = where the node is in the file (1-based, like your editor).
-- **`"IOException"`** = the source text, shown for small nodes.
-- **`ERROR` / `MISSING`** nodes mean tree-sitter found a syntax error at that spot.
+Tree:
+
+```
+catch_clause  (lines 18-21)
+├── catch_formal_parameter  (line 18)
+│   ├── catch_type
+│   │   └── type_identifier "IOException"
+│   └── name: identifier "e"
+└── body: block
+    ├── expression_statement  (line 19)
+    │   └── method_invocation
+    │       ├── object: identifier "LOG"
+    │       ├── name: identifier "error"
+    │       └── arguments: argument_list
+    │           ├── string_literal
+    │           │   └── string_fragment "read failed"
+    │           └── identifier "e"
+    └── throw_statement  (line 20)
+        └── identifier "e"
+```
+
+Each line is one node, made of:
+
+| Part | Example | Meaning |
+|---|---|---|
+| tree lines `├──` `└──` `│` | | which node is inside which. `└──` marks the last child |
+| field name (optional) | `object:` | which named slot of the parent this node fills |
+| **node type** | `method_invocation` | **what kind of thing it is; detectors search for these** |
+| text (small nodes only) | `"LOG"` | the source code of this node, as a reminder |
+| position (optional) | `(line 19)` | where it is in the file. **Left out when it is the same as the parent's** |
+
+`ERROR` / `MISSING` nodes mean tree-sitter found a syntax error at that spot.
 
 ## Project structure
 
@@ -86,6 +127,7 @@ src/
 fixtures/        small Java examples labelled FLAG / NO FLAG (expected detector results)
 docs/            the paper and the assignment description
 dist/            compiled JavaScript (created by `npm run build`, not in git)
+out/             your saved outputs (not in git)
 ```
 
 ## Notes and troubleshooting

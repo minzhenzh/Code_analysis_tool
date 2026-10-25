@@ -1,0 +1,6 @@
+{
+  // Make VS Code type-check with the project's TypeScript (node_modules),
+  // so the editor shows the same errors as `npx tsc`.
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}

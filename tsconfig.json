@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    // Compile to plain JavaScript that Node can run with `node dist/....js`.
+    "target": "ES2022",
+    "module": "commonjs",
+    "rootDir": "src",
+    "outDir": "dist",
+
+    // Lets us write `import Parser from "tree-sitter"` for CommonJS packages.
+    "esModuleInterop": true,
+
+    // Load Node's type definitions (fs, process, ...) from @types/node.
+    // TypeScript 6+ no longer does this automatically, so we list it explicitly.
+    "types": ["node"],
+
+    // Strict type checking: catches mistakes like forgetting that a value may be null.
+    "strict": true,
+
+    "sourceMap": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}

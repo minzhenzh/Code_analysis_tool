@@ -41,8 +41,8 @@ npm run build
 Give it one `.java` file or a folder (all `.java` files inside, including subfolders):
 
 ```bash
-node dist/cli.js fixtures/ThrowsKitchenSink.java
-node dist/cli.js fixtures --out out/fixtures
+node dist/cli.js fixtures/ThrowsKitchenSink.java    # one file
+node dist/cli.js path/to/guava                       # a whole project folder (Stage 5)
 ```
 
 The terminal shows a short summary:
@@ -51,12 +51,22 @@ The terminal shows a short summary:
 Analyzed 1 Java file(s) in fixtures/ThrowsKitchenSink.java
   Throws Kitchen Sink: 5 of 8 throws clauses (62.50%)
 Reports written to:
-  out/report.md
-  out/report.csv
-  out/report.json
+  out/ThrowsKitchenSink/report.md
+  out/ThrowsKitchenSink/report.csv
+  out/ThrowsKitchenSink/report.json
 ```
 
-The details are saved in the `--out` folder (default `out/`):
+The details are saved in a folder named after what you analyzed, so each run has its own place:
+
+```
+out/
+├── ThrowsKitchenSink/   <- from: node dist/cli.js fixtures/ThrowsKitchenSink.java
+├── guava/               <- from: node dist/cli.js path/to/guava   (Stage 5)
+└── ast/                 <- saved AST printouts (see below)
+```
+
+Running the same target again overwrites its folder. Use `--out <folder>` to choose another folder.
+Each folder contains:
 
 | File | For | Contents |
 |---|---|---|
@@ -97,11 +107,11 @@ Long trees are easier to read in VS Code than in the terminal. `>` sends the out
 instead of the screen (`out/` is ignored by git):
 
 ```bash
-mkdir -p out
-node dist/printAst.js fixtures/LogAndThrow.java --no-comments > out/LogAndThrow.ast.txt
+mkdir -p out/ast
+node dist/printAst.js fixtures/LogAndThrow.java --no-comments > out/ast/LogAndThrow.ast.txt
 ```
 
-Then open `out/LogAndThrow.ast.txt` in VS Code. Tip: VS Code can fold (collapse) the indented
+Then open `out/ast/LogAndThrow.ast.txt` in VS Code. Re-run the command after changing a fixture, or the saved file is out of date. Tip: VS Code can fold (collapse) the indented
 branches using the arrows next to the line numbers.
 
 ## How to read the output
@@ -180,7 +190,7 @@ src/
 fixtures/        small Java examples labelled FLAG / NO FLAG (expected detector results)
 docs/            the paper and the assignment description
 dist/            compiled JavaScript (created by `npm run build`, not in git)
-out/             reports and saved outputs (not in git)
+out/             generated reports, one folder per analyzed target, plus out/ast/ (not in git)
 ```
 
 ## Notes and troubleshooting

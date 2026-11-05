@@ -5,7 +5,8 @@
 // Usage:
 //   node dist/cli.js <file.java | folder> [--out <folder>]
 //
-// Reports (default folder: out/):
+// Reports go to out/<name of the target>/ unless --out is given, so every run has its own
+// clearly named folder (e.g. out/ThrowsKitchenSink/, out/fixtures/, out/guava/):
 //   report.md    human-readable summary + every finding (open in VS Code, Ctrl/Cmd+Shift+V to preview)
 //   report.csv   one row per finding (opens in Excel / Numbers)
 //   report.json  everything, for other programs
@@ -53,7 +54,7 @@ function findJavaFiles(target: string): string[] {
 function main(): void {
   const args = process.argv.slice(2);
   let target: string | null = null;
-  let outDir = "out";
+  let outDir: string | null = null;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--out") {
       outDir = args[i + 1];
@@ -65,6 +66,10 @@ function main(): void {
   if (target === null || !fs.existsSync(target)) {
     console.error("Usage: node dist/cli.js <file.java | folder> [--out <folder>]");
     process.exit(1);
+  }
+  if (outDir === null) {
+    // "fixtures/ThrowsKitchenSink.java" -> out/ThrowsKitchenSink, "../guava" -> out/guava
+    outDir = path.join("out", path.basename(path.resolve(target), ".java"));
   }
 
   const files = findJavaFiles(target);

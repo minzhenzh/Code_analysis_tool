@@ -4,8 +4,8 @@ CIS*6650 Assignment 2 (Minzhen Zhang). A tool that reads Java source code and de
 exception handling anti-patterns from de Pádua & Shang (ICPC 2017):
 Unreachable Handler, Log and Throw, and Throws Kitchen Sink.
 
-> **Status: Stage 1.** The tool can parse a Java file and print its syntax tree (AST).
-> The detectors are not written yet.
+> **Status: Stage 2.** The tool can print a Java file's syntax tree (AST), and the
+> Throws Kitchen Sink detector is written and tested. The other two detectors and the CLI are not written yet.
 
 ## Requirements
 
@@ -118,12 +118,33 @@ Each line is one node, made of:
 
 `ERROR` / `MISSING` nodes mean tree-sitter found a syntax error at that spot.
 
+## Run the tests
+
+```bash
+npm test
+```
+
+This compiles the code and runs every `dist/tests/*.test.js` with Node's built-in test runner.
+Each detector is tested against its fixture in `fixtures/`; the FLAG / NO FLAG labels there are the
+expected results.
+
+## Detection rules
+
+| Anti-pattern | Rule | Percentage is out of |
+|---|---|---|
+| Throws Kitchen Sink | a `throws` clause lists 2 or more exception types (purely syntactic; the method body is ignored) | all throws clauses |
+
 ## Project structure
 
 ```
 src/
   parser.ts      parseJava(text) / parseJavaFile(path): Java source -> tree-sitter tree
   printAst.ts    command-line program that prints the tree (uses parser.ts)
+  types.ts       Finding / DetectorResult: what every detector returns
+  astUtils.ts    shared helpers (line numbers, enclosing method name, comments)
+  detectors/
+    throwsKitchenSink.ts
+  tests/         one test file per detector (run with `npm test`)
 fixtures/        small Java examples labelled FLAG / NO FLAG (expected detector results)
 docs/            the paper and the assignment description
 dist/            compiled JavaScript (created by `npm run build`, not in git)

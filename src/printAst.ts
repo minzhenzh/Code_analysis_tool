@@ -20,6 +20,7 @@
 
 import Parser from "tree-sitter";
 import { parseJavaFile } from "./parser";
+import { startLine } from "./astUtils";
 
 // An `interface` describes the shape of an object (like a JSDoc @typedef).
 interface PrintOptions {
@@ -30,10 +31,6 @@ interface PrintOptions {
 }
 
 // tree-sitter counts rows from 0; editors count lines from 1. We print 1-based.
-function startLine(node: Parser.SyntaxNode): number {
-  return node.startPosition.row + 1;
-}
-
 function endLine(node: Parser.SyntaxNode): number {
   // A node that ends at column 0 really ends with the previous line's newline.
   if (node.endPosition.column === 0 && node.endPosition.row > node.startPosition.row) {

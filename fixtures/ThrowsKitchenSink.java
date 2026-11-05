@@ -28,6 +28,27 @@ public class ThrowsKitchenSink {
 
     // NO FLAG: no throws clause at all
     public void close() { }
+
+    // ---- Quiz variants (added in Stage 2) ----
+
+    // NO FLAG: `catch (A | B e)` is a multi-catch (catches A or B). It is a catch clause,
+    // not a throws clause, and this rule only looks at throws clauses.
+    void multiCatch() {
+        try {
+            open();
+        } catch (IOException | SQLException e) { }
+    }
+
+    // FLAG: fully qualified names are still just 2 types. The tool must count the types
+    // in the clause, not every identifier inside them (java, io, IOException, ...).
+    void qualified() throws java.io.IOException, java.sql.SQLException { }
+
+    // NO FLAG: the throws clause declares only ONE type. The `throw` statement in the body
+    // is not part of the throws clause (IllegalStateException is unchecked, so Java does not
+    // require it to be declared).
+    void throwInBody() throws IOException {
+        throw new IllegalStateException("bad");
+    }
 }
 
 interface Fetcher {

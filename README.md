@@ -4,8 +4,8 @@ CIS*6650 Assignment 2 (Minzhen Zhang). A tool that reads Java source code and de
 exception handling anti-patterns from de Pádua & Shang (ICPC 2017):
 Unreachable Handler, Log and Throw, and Throws Kitchen Sink.
 
-> **Status: Stage 2.** The tool can print a Java file's syntax tree (AST), and the
-> Throws Kitchen Sink detector is written and tested. The other two detectors and the CLI are not written yet.
+> **Status: Stage 2.** The Throws Kitchen Sink detector is written, tested, and runs from the CLI.
+> Log and Throw and Unreachable Handler are not written yet.
 
 ## Requirements
 
@@ -35,6 +35,36 @@ npm run build
 ```
 
 **Run this again after every change to a `.ts` file**, otherwise you are running the old code.
+
+## Run: detect anti-patterns
+
+Give it one `.java` file or a folder (all `.java` files inside, including subfolders):
+
+```bash
+node dist/cli.js fixtures/ThrowsKitchenSink.java
+node dist/cli.js fixtures --out out/fixtures
+```
+
+The terminal shows a short summary:
+
+```
+Analyzed 1 Java file(s) in fixtures/ThrowsKitchenSink.java
+  Throws Kitchen Sink: 5 of 8 throws clauses (62.50%)
+Reports written to:
+  out/report.md
+  out/report.csv
+  out/report.json
+```
+
+The details are saved in the `--out` folder (default `out/`):
+
+| File | For | Contents |
+|---|---|---|
+| `report.md` | reading | summary table + one table of findings (file:line, method, detail) per anti-pattern. In VS Code, press Cmd+Shift+V to see it formatted |
+| `report.csv` | spreadsheets | one row per finding; opens in Excel / Numbers |
+| `report.json` | programs | everything: summary, findings, skipped files |
+
+A file that cannot be read or parsed is skipped and listed in the report instead of stopping the run.
 
 ## Run: print the AST of a Java file
 
@@ -138,6 +168,8 @@ expected results.
 
 ```
 src/
+  cli.ts         main program: finds .java files, runs the detectors, prints a summary
+  report.ts      writes report.md / report.csv / report.json
   parser.ts      parseJava(text) / parseJavaFile(path): Java source -> tree-sitter tree
   printAst.ts    command-line program that prints the tree (uses parser.ts)
   types.ts       Finding / DetectorResult: what every detector returns
@@ -148,7 +180,7 @@ src/
 fixtures/        small Java examples labelled FLAG / NO FLAG (expected detector results)
 docs/            the paper and the assignment description
 dist/            compiled JavaScript (created by `npm run build`, not in git)
-out/             your saved outputs (not in git)
+out/             reports and saved outputs (not in git)
 ```
 
 ## Notes and troubleshooting

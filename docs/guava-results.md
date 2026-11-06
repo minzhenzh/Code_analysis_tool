@@ -5,8 +5,23 @@
 - Subject: Guava **v19.0** (git tag `v19.0`, commit `daa84b6`), cloned into `subjects/guava-19.0/` (not in git).
 - Scope: the **`guava/` module only** (main library source, 469 `.java` files). Tests (`guava-tests`,
   `guava-testlib`) and the GWT copy (`guava-gwt`) are excluded. This matches the paper's scope: our
-  totals for `guava/` agree with the paper's Table II (509 throws, 317 catch), while any larger scope
-  is far off (e.g. the whole repository has 3,635 catch blocks and 8,116 throws clauses).
+  totals for `guava/` agree with the paper's Table II (509 throws exactly, 320 vs. 317 catch), while any
+  larger scope is far off (e.g. the whole repository has 3,635 catch blocks and 8,116 throws clauses).
+- About Guava: Google's core libraries for Java (collections, caching, concurrency, strings, I/O, hashing, ...).
+  Source: https://github.com/google/guava, API documentation for this exact version:
+  https://guava.dev/releases/19.0/api/docs/, user guide: https://github.com/google/guava/wiki.
+
+### The paper's tool and data
+
+- The paper's artifact page (https://guipadua.github.io/icpc2017, footnote 1 of the paper) lists the same
+  subject release, https://github.com/google/guava/releases/tag/v19.0. Together with the identical
+  throws count (509), this indicates we analyze the same code.
+- Their Java tool is **JTratch** (https://github.com/guipadua/JTratch, release `2017icpc_era_cr`), written
+  in Java on Eclipse JDT. It needs a local Maven repository to resolve the analyzed project's libraries,
+  i.e. it has real type information. Its README describes CSV output of try-catch *metrics*; the rule
+  that turns those metrics into "Unreachable Handler" is not documented on the page or in the README.
+- The page also offers the exported raw data (`icpc2017_data_sources.zip`) and Tableau visualizations.
+  We did not run JTratch or analyze that data (out of scope for this prototype).
 - Command (about 0.6 s):
 
   ```bash
@@ -34,8 +49,8 @@ match. This also confirms that we analyze the same files as the paper.
 
 ### Catch blocks: 320 vs. 317
 
-The 3 extra catch blocks most likely come from a small difference in what the two tools count (the
-paper's tool is not available to check). It changes the percentages by less than 1%.
+The 3 extra catch blocks most likely come from a small difference in what the two tools count (we did
+not run JTratch to check). It changes the percentages by less than 1%.
 
 ### Log and Throw: 1 vs. 0
 
@@ -104,6 +119,41 @@ matching, operations) and over-reports in others (missing library documentation,
 Precisely detecting this anti-pattern needs type bindings and complete library documentation, which
 is exactly why the paper used Eclipse JDT.
 
+### Who is closer to the truth? An upper bound from the Java compiler
+
+The Java compiler rejects a `catch` of a **checked** exception that the try block cannot throw (JLS §11.2.3).
+Guava is a released library and compiles, so **every catch of checked exceptions in Guava is reachable**;
+only catches of unchecked exceptions (RuntimeException or Error family) can be unreachable. Classifying all
+320 catch blocks of the `guava/` module:
+
+| Kind of catch | Count | Can it be unreachable? |
+|---|---:|---|
+| only checked exceptions (IOException, InterruptedException, PrivilegedActionException, ...) | ≈128 | no, the compiler guarantees it is reachable |
+| generic (`Exception` / `Throwable`) | 81 | practically no: catches any runtime exception or error |
+| unchecked exceptions (ClassCastException, NullPointerException, IllegalArgumentException, ...) | ≈111 | possibly |
+
+(Counts use the tool's hierarchy tables; a few types missing from the JDK table were classified by hand.)
+
+Consequences:
+
+- **At most ≈111 / 320 ≈ 35%** of Guava's catches can be unreachable at all, and only if *every* unchecked
+  catch were unreachable, which is clearly not the case (e.g. `catch (ClassCastException)` around a cast,
+  `catch (NumberFormatException)` around `parseInt`).
+- The **paper's 37.22% (≈118 catches) is above this bound**, so its result must include catches that the
+  compiler proves reachable, assuming "unreachable" means what Table I says. The most likely reason is that
+  exceptions not visible in declarations or documentation (from casts, dereferences, undocumented calls)
+  were not counted as possible.
+- **Our 11.56% is also too high**: 13 of our 37 findings catch checked exceptions and are therefore
+  provable false positives, leaving at most 24 (7.5%); the manual check above found further false
+  positives among those. The true rate is therefore most likely a few percent.
+- Caveat: for unchecked exceptions there is no exact definition of "can be thrown" (almost any
+  dereference can throw NullPointerException), so every tool must choose which exceptions count as
+  possible. An exact answer would need manual labelling of the ≈111 unchecked catches.
+
+A possible improvement, not applied in this version, is to use the compiler's rule directly: never flag a
+catch whose types are all checked exceptions (assuming the analyzed code compiles). On Guava this would
+remove the 13 provable false positives.
+
 ## Summary
 
 - The tool analyzes the same 469 files as the paper (509 throws clauses, exact).
@@ -112,3 +162,6 @@ is exactly why the paper used Eclipse JDT.
   found in the first run were fixed by refining the rule; the 1 remaining finding is a real Log and Throw.
 - **Unreachable Handler** is lower (11.56% vs. 37.22%). The sensitivity analysis shows the difference
   comes from how possible exceptions are estimated; with fewer exception sources our tool reaches 31.88%.
+  The Java compiler bounds the true value at ≈35% (only unchecked catches can be unreachable), so the
+  paper over-reports; ours over-reports too (13 findings are checked catches), and the true rate is most
+  likely a few percent.

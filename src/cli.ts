@@ -1,9 +1,13 @@
+#!/usr/bin/env node
 // cli.ts
 // The command-line entry point: run every detector on a Java file or a whole folder,
 // print a short summary, and save readable reports to files.
+// (The first line above, the "shebang", lets macOS/Linux run this file directly as a
+// command once it is installed: see "bin" in package.json.)
 //
 // Usage:
-//   node dist/cli.js <file.java | folder> [--out <folder>]
+//   antipattern-detector <file.java | folder> [--out <folder>]     (after installing)
+//   node dist/cli.js <file.java | folder> [--out <folder>]         (from the project folder)
 //
 // Reports go to out/<name of the target>/ unless --out is given, so every run has its own
 // clearly named folder (e.g. out/ThrowsKitchenSink/, out/fixtures/, out/guava/):
@@ -56,20 +60,51 @@ function findJavaFiles(target: string): string[] {
   return files;
 }
 
+const USAGE = `Usage: antipattern-detector <file.java | folder> [--out <folder>]
+
+Detects three exception handling anti-patterns in Java source code:
+  Unreachable Handler, Log and Throw, Throws Kitchen Sink
+(de Padua & Shang, ICPC 2017).
+
+Arguments:
+  <file.java | folder>   a Java file, or a folder (all .java files inside, including subfolders)
+
+Options:
+  --out <folder>   where to write report.md / report.csv / report.json
+                   (default: out/<name of the file or folder>)
+  --help           show this help
+  --version        show the version`;
+
+// The version number from package.json (one folder up from dist/).
+function readVersion(): string {
+  const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  return packageJson.version;
+}
+
 function main(): void {
   const args = process.argv.slice(2);
   let target: string | null = null;
   let outDir: string | null = null;
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--out") {
+    if (args[i] === "--help" || args[i] === "-h") {
+      console.log(USAGE);
+      return;
+    } else if (args[i] === "--version" || args[i] === "-v") {
+      console.log(readVersion());
+      return;
+    } else if (args[i] === "--out") {
       outDir = args[i + 1];
       i++;
     } else {
       target = args[i];
     }
   }
-  if (target === null || !fs.existsSync(target)) {
-    console.error("Usage: node dist/cli.js <file.java | folder> [--out <folder>]");
+  if (target === null) {
+    console.error(USAGE);
+    process.exit(1);
+  }
+  if (!fs.existsSync(target)) {
+    console.error(`Error: "${target}" does not exist.\n\n${USAGE}`);
     process.exit(1);
   }
   if (outDir === null) {

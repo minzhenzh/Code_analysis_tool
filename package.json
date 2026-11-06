@@ -1,10 +1,22 @@
 {
   "name": "exception-antipattern-detector",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Detects exception handling anti-patterns (Unreachable Handler, Log and Throw, Throws Kitchen Sink) in Java source code",
-  "private": true,
+  "bin": {
+    "antipattern-detector": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "!dist/tests",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "tsc",
+    "prepack": "tsc",
+    "analyze": "node dist/cli.js",
     "ast": "node dist/printAst.js",
     "test": "tsc && node --test --test-reporter=spec \"dist/tests/*.test.js\""
   },

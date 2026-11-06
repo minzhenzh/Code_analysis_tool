@@ -12,6 +12,26 @@ export function isComment(node: Parser.SyntaxNode): boolean {
   return node.type === "line_comment" || node.type === "block_comment";
 }
 
+// The short name of a type node, which is how we compare exception types:
+//   IOException               -> "IOException"
+//   java.io.IOException       -> "IOException"   (drop the package)
+//   java.util.AbstractList<T> -> "AbstractList"  (drop the generic part)
+export function simpleTypeName(typeNode: Parser.SyntaxNode): string {
+  const withoutGenerics = typeNode.text.split("<")[0];
+  const parts = withoutGenerics.split(".");
+  return parts[parts.length - 1].trim();
+}
+
+// The exception type of `throw new X(...)`, or null for other forms such as `throw e;`.
+export function thrownTypeName(throwStatement: Parser.SyntaxNode): string | null {
+  const thrown = throwStatement.namedChildren.find((child) => !isComment(child));
+  if (thrown !== undefined && thrown.type === "object_creation_expression") {
+    const type = thrown.childForFieldName("type");
+    return type !== null ? simpleTypeName(type) : null;
+  }
+  return null;
+}
+
 // Walk up the tree (node -> parent -> parent ...) until we reach the method or
 // constructor that contains `node`, and return its name.
 export function enclosingMethodName(node: Parser.SyntaxNode): string {

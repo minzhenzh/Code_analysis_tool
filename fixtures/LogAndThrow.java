@@ -49,14 +49,68 @@ public class LogAndThrow {
         }
     }
 
-    // DECIDE: printing to stderr then rethrowing. Is System.err.println a "logging call"?
-    // The paper does not say. Pick a rule, apply it consistently, and state it in your README/report.
+    // FLAG (decided in Stage 3): printing to stderr then rethrowing. The paper does not say whether
+    // System.err.println is a "logging call"; this tool counts console printing (System.out/err
+    // print/println/printf and e.printStackTrace()) as logging, because it still "logs some information".
     void e() throws IOException {
         try {
             read();
         } catch (IOException e) {
             System.err.println("read failed");
             throw e;
+        }
+    }
+
+    // ---- Quiz variants (added in Stage 3) ----
+
+    // FLAG: java.util.logging style (what Guava uses): object `logger`, method `log`
+    void julLogger() {
+        try {
+            close();
+        } catch (IOException e) {
+            logger.log(Level.WARNING, "close failed", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    // FLAG: the throw is nested inside an `if`, but it is still inside the catch body.
+    // The rule is "the body CONTAINS a throw" (anywhere inside), not "a direct child is a throw".
+    // When strict is true, this handler logs AND propagates.
+    void conditionalThrow(boolean strict) throws IOException {
+        try {
+            read();
+        } catch (IOException e) {
+            LOG.error("read failed", e);
+            if (strict) {
+                throw e;
+            }
+        }
+    }
+
+    // NO FLAG: failures.add(e) is a method call but not a logging call
+    // (object "failures" is not a logger, "add" is not a logging method). Only throws.
+    void notALogCall() {
+        try {
+            read();
+        } catch (IOException e) {
+            failures.add(e);
+            throw new IllegalStateException(e.getMessage());
+        }
+    }
+
+    // ---- Added in Stage 5 (pattern found in Guava's Closeables.close and Flushables.flush) ----
+
+    // NO FLAG: the handler logs OR throws, never both. The log call and the throw are in
+    // opposite branches of the same if/else, so no run of this handler does both.
+    void eitherLogOrThrow(boolean swallow) throws IOException {
+        try {
+            read();
+        } catch (IOException e) {
+            if (swallow) {
+                LOG.warn("read failed", e);
+            } else {
+                throw e;
+            }
         }
     }
 

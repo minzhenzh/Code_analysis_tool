@@ -17,19 +17,24 @@ import Parser from "tree-sitter";
 import { parseJavaFile } from "./parser";
 import { AntiPattern, DetectorResult, Finding } from "./types";
 import { detectThrowsKitchenSink } from "./detectors/throwsKitchenSink";
+import { detectLogAndThrow } from "./detectors/logAndThrow";
+import { detectUnreachableHandler } from "./detectors/unreachableHandler";
+import { buildRepoIndex, RepoIndex } from "./repoIndex";
 import { Report, Summary, writeReports } from "./report";
 
 // Everything the CLI needs to know about one detector.
 interface DetectorInfo {
   antiPattern: AntiPattern;
   unit: string; // what the percentage is out of, e.g. "throws clauses"
-  // A function type: `detect` must be a function taking a tree and a file path
-  // and returning a DetectorResult.
-  detect: (tree: Parser.Tree, filePath: string) => DetectorResult;
+  // A function type: `detect` must be a function taking a tree, a file path and the
+  // repo index, and returning a DetectorResult. Detectors that do not need the index
+  // (Log and Throw, Throws Kitchen Sink) simply declare fewer parameters.
+  detect: (tree: Parser.Tree, filePath: string, index: RepoIndex) => DetectorResult;
 }
 
-// Add the Log and Throw and Unreachable Handler detectors here in Stages 3 and 4.
 const DETECTORS: DetectorInfo[] = [
+  { antiPattern: "Unreachable Handler", unit: "catch blocks", detect: detectUnreachableHandler },
+  { antiPattern: "Log and Throw", unit: "catch blocks", detect: detectLogAndThrow },
   { antiPattern: "Throws Kitchen Sink", unit: "throws clauses", detect: detectThrowsKitchenSink },
 ];
 
@@ -73,25 +78,32 @@ function main(): void {
   }
 
   const files = findJavaFiles(target);
-
-  // Collect results per detector across all files.
-  const findings: Finding[] = [];
-  const totals: number[] = DETECTORS.map(() => 0);
   const failedFiles: string[] = [];
 
+  // Parse every file once and keep the trees: both passes below use them.
+  // One unreadable or broken file should not stop the whole run.
+  const parsed: { file: string; tree: Parser.Tree }[] = [];
   for (const file of files) {
-    // One unreadable or broken file should not stop the whole run.
     try {
-      const tree = parseJavaFile(file);
-      DETECTORS.forEach((detector, i) => {
-        const result = detector.detect(tree, file);
-        findings.push(...result.findings);
-        totals[i] += result.total;
-      });
+      parsed.push({ file: file, tree: parseJavaFile(file) });
     } catch (err) {
       failedFiles.push(file);
       console.error(`Skipped ${file}: ${(err as Error).message}`);
     }
+  }
+
+  // Pass 1: learn the repo's exception hierarchy and what each method throws.
+  const index = buildRepoIndex(parsed.map((p) => p.tree));
+
+  // Pass 2: run every detector on every file, collecting results per detector.
+  const findings: Finding[] = [];
+  const totals: number[] = DETECTORS.map(() => 0);
+  for (const { file, tree } of parsed) {
+    DETECTORS.forEach((detector, i) => {
+      const result = detector.detect(tree, file, index);
+      findings.push(...result.findings);
+      totals[i] += result.total;
+    });
   }
 
   const summary: Summary[] = DETECTORS.map((detector, i) => {

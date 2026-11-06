@@ -4,8 +4,23 @@ CIS*6650 Assignment 2 (Minzhen Zhang). A tool that reads Java source code and de
 exception handling anti-patterns from de Pádua & Shang (ICPC 2017):
 Unreachable Handler, Log and Throw, and Throws Kitchen Sink.
 
-> **Status: Stage 2.** The Throws Kitchen Sink detector is written, tested, and runs from the CLI.
-> Log and Throw and Unreachable Handler are not written yet.
+> **Status: Stage 5.** All three detectors are written, tested, and run from the CLI. Results on
+> Guava v19.0 and the comparison with the paper are in [docs/guava-results.md](docs/guava-results.md).
+
+## Results on Guava v19.0 (`guava/` module, 469 files)
+
+| Anti-pattern | Paper | This tool |
+|---|---:|---:|
+| Unreachable Handler (% of catch blocks) | 37.22% | 11.56% (37/320) |
+| Log and Throw (% of catch blocks) | 0.00% | 0.31% (1/320) |
+| Throws Kitchen Sink (% of throws clauses) | 11.79% | 11.79% (60/509) |
+
+To reproduce:
+
+```bash
+git clone --depth 1 --branch v19.0 https://github.com/google/guava.git subjects/guava-19.0
+node dist/cli.js subjects/guava-19.0/guava
+```
 
 ## Requirements
 
@@ -42,13 +57,15 @@ Give it one `.java` file or a folder (all `.java` files inside, including subfol
 
 ```bash
 node dist/cli.js fixtures/ThrowsKitchenSink.java    # one file
-node dist/cli.js path/to/guava                       # a whole project folder (Stage 5)
+node dist/cli.js subjects/guava-19.0/guava          # a whole project folder
 ```
 
 The terminal shows a short summary:
 
 ```
 Analyzed 1 Java file(s) in fixtures/ThrowsKitchenSink.java
+  Unreachable Handler: 1 of 1 catch blocks (100.00%)
+  Log and Throw: 0 of 1 catch blocks (0.00%)
   Throws Kitchen Sink: 5 of 8 throws clauses (62.50%)
 Reports written to:
   out/ThrowsKitchenSink/report.md
@@ -61,7 +78,7 @@ The details are saved in a folder named after what you analyzed, so each run has
 ```
 out/
 ├── ThrowsKitchenSink/   <- from: node dist/cli.js fixtures/ThrowsKitchenSink.java
-├── guava/               <- from: node dist/cli.js path/to/guava   (Stage 5)
+├── guava/               <- from: node dist/cli.js subjects/guava-19.0/guava
 └── ast/                 <- saved AST printouts (see below)
 ```
 
@@ -172,7 +189,52 @@ expected results.
 
 | Anti-pattern | Rule | Percentage is out of |
 |---|---|---|
+| Unreachable Handler | none of the catch's types is related (same class, subclass, or superclass) to any exception the try block can possibly throw. `catch (Exception)` / `catch (Throwable)` are always reachable | all catch blocks |
+| Log and Throw | a catch block's body contains (anywhere inside, also nested in `if`/loops) both a **logging call** and a `throw` statement, except when the two are in opposite branches of the same `if`/`else` (then the handler logs *or* throws, never both) | all catch blocks |
 | Throws Kitchen Sink | a `throws` clause lists 2 or more exception types (purely syntactic; the method body is ignored) | all throws clauses |
+
+**What counts as a logging call** (the paper does not define it; this is the tool's decision):
+
+1. **Logger calls**: the object's name ends in `log` or `logger` (case-insensitive: `LOG`, `LOGGER`,
+   `logger`, `this.logger`, `getLogger()`) **and** the method is a logging method:
+   `trace debug info warn error fatal` (SLF4J / Log4j) or
+   `log severe warning info config fine finer finest` (`java.util.logging`, used by Guava).
+2. **Console printing**: `System.out` / `System.err` `.print` / `.println` / `.printf`, and `printStackTrace()`.
+   Printing still "logs some information", so it counts.
+
+**How Unreachable Handler finds "what the try block can throw"** without type information
+(the paper used Eclipse JDT bindings; this tool only has the syntax tree). The run has two passes:
+
+- **Pass 1, repo index** (`src/repoIndex.ts`), built from every file before detecting:
+  - the repo's class hierarchy, from every `class X extends Y`;
+  - for each **method name**: the types in its `throws` clause, its `@throws` / `@exception` Javadoc
+    tags, and the `throw new X(...)` statements in its body. Constructors are stored under their class name.
+- **Pass 2, for each catch**, the try block (and try-with-resources resources) can throw:
+  1. `throw new X(...)` → X; `throw e;` → the declared type of variable `e`;
+  2. a call `foo(...)` / `x.foo(...)` → the index entry for the name `foo`, plus the JDK table;
+  3. `new Foo(...)` → what `Foo`'s constructors may throw (index + JDK table);
+  4. operations: `/` and `%` → ArithmeticException; `a[i]` → ArrayIndexOutOfBoundsException;
+     `(Foo) x` → ClassCastException; `x.foo()` / `x.field` → NullPointerException; `assert` → AssertionError;
+  5. try-with-resources → whatever `close()` may throw.
+- The JDK is not in the repo, so `src/jdkExceptions.ts` holds a hand-written table of common JDK exception
+  classes (who extends whom), common JDK methods by name (e.g. `parseInt` → NumberFormatException,
+  `read`/`close` → IOException) and constructors (e.g. `new FileInputStream` → FileNotFoundException).
+
+Approximations (limitations) of Unreachable Handler:
+- **Calls are matched by name only.** All repo methods named `close` share one entry, and the JDK
+  entry for `get` covers both `Future.get` and `List.get`. This can only make the tool flag *less*.
+- **Unknown calls throw nothing.** A call to a library method that is neither in the repo nor in the
+  JDK table adds no exceptions, so a catch around it may be flagged when it is really reachable (flag *more*).
+- **One level only.** For `a()` the index records what `a` declares, documents, or throws itself, not what
+  the methods called by `a` throw.
+- **No scoping inside the try block.** A `throw` or call inside a nested try that catches it, or inside
+  a lambda / anonymous class, still counts as possible (flag *less*).
+- A `throw` whose type cannot be worked out (e.g. `throw makeException();`) makes the catch count as reachable.
+- Types are compared by simple name (`java.io.IOException` = `IOException`).
+
+Known limitations of Log and Throw: a logger with an unusual name (e.g. `audit.warn(...)`) is missed; a non-logger
+whose name ends in "log" (e.g. `dialog.warn(...)`) would be counted; a `throw` inside a lambda or
+anonymous class written in the catch block is counted even though it does not leave the handler.
 
 ## Project structure
 
@@ -183,8 +245,12 @@ src/
   parser.ts      parseJava(text) / parseJavaFile(path): Java source -> tree-sitter tree
   printAst.ts    command-line program that prints the tree (uses parser.ts)
   types.ts       Finding / DetectorResult: what every detector returns
-  astUtils.ts    shared helpers (line numbers, enclosing method name, comments)
+  astUtils.ts    shared helpers (line numbers, enclosing method name, type names, comments)
+  repoIndex.ts   pass 1: class hierarchy + what each method name may throw, for the whole repo
+  jdkExceptions.ts  hand-written tables of common JDK exceptions, methods and constructors
   detectors/
+    unreachableHandler.ts
+    logAndThrow.ts
     throwsKitchenSink.ts
   tests/         one test file per detector (run with `npm test`)
 fixtures/        small Java examples labelled FLAG / NO FLAG (expected detector results)

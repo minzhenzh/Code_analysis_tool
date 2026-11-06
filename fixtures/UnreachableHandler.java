@@ -65,7 +65,43 @@ public class UnreachableHandler {
         } catch (ConfigException e) { }
     }
 
+    // ---- Quiz variants (added in Stage 4) ----
+
+    // NO FLAG: readAll() declares the PARENT type IOException, so it may throw any kind of
+    // IOException, including the child FileNotFoundException. (Java compiles this catch.)
+    void declaredParent() {
+        try {
+            readAll();
+        } catch (FileNotFoundException e) { }
+    }
+
+    // NO FLAG: multi-catch. NumberFormatException can be thrown by parseInt, so the handler
+    // catches at least one possible exception. (IllegalStateException alone would be unreachable.)
+    void multiCatch(String s) {
+        try {
+            Integer.parseInt(s);
+        } catch (NumberFormatException | IllegalStateException e) { }
+    }
+
+    // NO FLAG: integer division by zero throws ArithmeticException, with no call or throw.
+    // The tool treats `/` and `%` as possible ArithmeticException.
+    void division(int x, int y) {
+        try {
+            int q = x / y;
+        } catch (ArithmeticException e) { }
+    }
+
+    // FLAG: loadConfig() throws ConfigException, which is unrelated to IllegalArgumentException
+    // (siblings under RuntimeException, neither is a subclass of the other).
+    void unrelatedType() {
+        try {
+            loadConfig();
+        } catch (IllegalArgumentException e) { }
+    }
+
     void openFile() throws FileNotFoundException { }
+
+    void readAll() throws IOException { }
 
     void loadConfig() {
         throw new ConfigException();

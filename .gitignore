@@ -4,3 +4,4 @@ dist/
 out/
 subjects/
 release/
+.vscode/

@@ -39,7 +39,7 @@ The comparison, a sensitivity analysis and a manual check of the findings are in
 ## Quick start (from the source folder)
 
 ```bash
-cd Code_analysis_tool          # the project folder; quote the path if it contains spaces
+cd Minzhen_SourceCode          # the project folder; quote the path if it contains spaces
 npm install                    # download the libraries into node_modules/
 npm run build                  # compile TypeScript (src/) to JavaScript (dist/)
 node dist/cli.js fixtures/LogAndThrow.java
@@ -54,7 +54,7 @@ The tool can be installed as a command named **`antipattern-detector`**, so it r
 **From the release package** (`release/exception-antipattern-detector-1.0.0.tgz`):
 
 ```bash
-npm install -g release/exception-antipattern-detector-1.0.0.tgz
+npm install -g ./release/exception-antipattern-detector-1.0.0.tgz
 antipattern-detector --help
 ```
 
@@ -258,11 +258,11 @@ src/
   printAst.ts          developer tool: print a file's syntax tree
   tests/               one test file per detector (npm test)
 fixtures/              Java examples labelled FLAG / NO FLAG (expected results)
-docs/                  the paper, the assignment, guava-results.md
-release/               the installable package (.tgz), created by npm pack (not in git)
-dist/                  compiled JavaScript, created by npm run build (not in git)
-out/                   generated reports, one folder per analyzed target (not in git)
-subjects/              downloaded projects to analyze, e.g. guava-19.0 (not in git)
+docs/guava-results.md  detailed evaluation on Guava v19.0
+release/               the executable: installable package (.tgz), created by npm pack
+dist/                  compiled JavaScript, created by npm run build
+out/                   generated reports, one folder per analyzed target
+subjects/              downloaded projects to analyze, e.g. guava-19.0
 ```
 
 ## Troubleshooting
@@ -273,4 +273,3 @@ subjects/              downloaded projects to analyze, e.g. guava-19.0 (not in g
   (`Invalid argument`). `parser.ts` passes a buffer size larger than each file, so files of any size parse.
 - **VS Code shows "Cannot find name 'fs'"**: VS Code is using its own TypeScript version. Run
   "TypeScript: Select TypeScript Version" -> "Use Workspace Version" from the command palette.
-  (`.vscode/settings.json` and `"types": ["node"]` in `tsconfig.json` already handle this.)
